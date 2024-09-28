@@ -36,4 +36,27 @@ public class Node {
     public List<byte[]> chunkFile(String filePath) {
         return new ArrayList<>(); // placeholder code to not get errors.
     }
+
+
+    //basic helper methods
+    public void addPeer(Node peer) {
+        peers.add(peer);
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public String getPeerID() {
+        return peerID;
+    }
+
+    public String getIPAddress() {
+        return IPAddress;
+    }
+
+    public List<Node> getPeers() {
+        return peers;
+    }
+
 }
