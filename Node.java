@@ -47,23 +47,80 @@ public class Node {
 
     //to do later... this method handles the incoming connection. (calls receive function).
     public void handleConnection(Socket socket) throws IOException{
+        try(DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+            String outputFilePath = "output.txt";
+            receive(inputStream, "output.txt");
+            System.out.println("Successfully received, saved to  " + outputFilePath );
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("Error receiving file " + e.getMessage());
+        }
+        finally {
+            socket.close();
+        }
 
     }
 
     // This method will handle sending chunks of data to other peers.
     public void send(String targetPeerID, String filePath) {
         List<byte[]> chunks = chunkFile(filePath);
-        // To implement later.
+        //chunks will be sent one at a time in a loop.
+        // Find the target peer in the list of peers.
+        Node targetPeer = null;
+        for (Node peer : peers) {
+            if (peer.getPeerID().equals(targetPeerID)) {
+                targetPeer = peer;
+                break;
+            }
+        }
+        if (targetPeer == null) {
+            System.out.println("Peer " + targetPeerID + " not found.");
+            return;
+        }
+
+        //create a socket connection to the peers IP address and port number.
+        try (Socket socket = new Socket(targetPeer.getIPAddress(), targetPeer.getPort())) {
+            //send the chunks to the peer.
+            for (byte[] chunk : chunks) {
+                socket.getOutputStream().write(chunk.length);
+                socket.getOutputStream().write(chunk);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    //close the socket connection
+
+    //add logging
+    System.out.println("Sent file to " + targetPeerID);
+
     }
 
     // This method will handle receiving chunks of data from other peers.
     public void receive(DataInputStream inputStream, String outputFilePath) throws IOException {
         List<byte[]> chunks = new ArrayList<>();
         // To implement later.
+        // Read the chunks from the input stream and add them to the list.
+        // Once all chunks are received, reassemble the file.
+        try {
+            while (true) {
+                int chunkSize = inputStream.read();
+                if (chunkSize == -1) {
+                    break;
+                }
+                byte[] chunk = new byte[chunkSize];
+                inputStream.readFully(chunk);
+                chunks.add(chunk);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
 
         assembleFile(chunks, outputFilePath);
+        //add logging
+        System.out.println("Received file from " + inputStream);
+        System.out.println("File saved to " + outputFilePath);
     }
-
+}
 
 
 
