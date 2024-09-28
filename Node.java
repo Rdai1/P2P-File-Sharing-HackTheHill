@@ -1,3 +1,6 @@
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +18,19 @@ public class Node {
         this.port = port;
         this.peers = peers;
     }
+
+    //Method to accept incoming connections and log them.
+    public void startListening() throws IOException {
+        ServerSocket serverSocket = new ServerSocket(port);
+        System.out.println("Peer " + peerID + " is listening on port " + port);
+
+        while (true) {
+            Socket socket = serverSocket.accept();
+            System.out.println("Accepted connection from " + socket.getInetAddress());
+            // to be continued later.
+        }
+    }
+
 
     // This method will typically read from a file (filePath), then divide into chunks of 512 bytes.
     public List<byte[]> chunkFile(String filePath) {
