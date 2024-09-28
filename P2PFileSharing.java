@@ -52,6 +52,16 @@ public class P2PFileSharing {
             }
         }).start();
 
-        //test sending here?
+        // Test sending a file from Peer1 to Peer2
+        String filePath = "path/to/your/testfile.txt"; // Replace with the actual path of the test file
+        new Thread(() -> {
+            try {
+                // Allow some time for peers to start listening
+                Thread.sleep(2000);
+                peer1.send("Peer2", filePath);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 }
