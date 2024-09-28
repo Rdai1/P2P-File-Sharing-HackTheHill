@@ -6,6 +6,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 
 public class Node {
     // attributes
@@ -57,17 +59,6 @@ public class Node {
         finally {
             socket.close();
         }
-
-    }
-
-
-    // This method will read from a file (filePath), then divide into chunks of 512 bytes.
-    public List<byte[]> chunkFile(String filePath) {
-        return new ArrayList<>(); // placeholder code to not get errors.
-    }
-
-    // This method will reassemble the previously chunked data back into a complete file.
-    private void assembleFile(List<byte[]> chunks, String outputFilePath) throws IOException {
 
     }
 
