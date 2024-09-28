@@ -1,4 +1,5 @@
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -6,6 +7,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.EOFException;
+import java.io.File;
 
 public class Node {
     // attributes
@@ -61,6 +64,8 @@ public class Node {
     // This method will handle sending chunks of data to other peers.
     public void send(String targetPeerID, String filePath) {
         List<FileChunk> chunks = fileHandling.chunkFile(filePath); // Use the imported method
+        File file = new File(filePath);
+
         // Find the target peer in the list of peers.
         Node targetPeer = null;
         for (Node peer : peers) {
@@ -75,11 +80,16 @@ public class Node {
         }
 
         // Create a socket connection to the peer's IP address and port number.
-        try (Socket socket = new Socket(targetPeer.getIPAddress(), targetPeer.getPort())) {
+        try (Socket socket = new Socket(targetPeer.getIPAddress(), targetPeer.getPort());
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+            
+            outputStream.writeUTF(file.getName());
+            outputStream.writeLong(file.length());
+
             // Send the chunks to the peer.
             for (FileChunk chunk : chunks) {
-                socket.getOutputStream().write(chunk.getData().length);
-                socket.getOutputStream().write(chunk.getData());
+                outputStream.writeInt(chunk.getData().length); // Send chunk size as an integer
+                outputStream.write(chunk.getData());           // Send chunk data
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -93,25 +103,32 @@ public class Node {
     // This method will handle receiving chunks of data from other peers.
     public void receive(DataInputStream inputStream, String outputFilePath) throws IOException {
         List<byte[]> chunks = new ArrayList<>();
+        String fileName = "received" + inputStream.readUTF();   // Receive the file name
+        long fileSize = inputStream.readLong();
         try {
+            System.out.println("BEFORE WHILE LOOP");
             while (true) {
-                int chunkSize = inputStream.read();
-                if (chunkSize == -1) {
-                    break;
+                int chunkSize;
+                try {
+                    chunkSize = inputStream.readInt(); // Read chunk size as an integer
+                } catch (EOFException e) {
+                    System.out.println("EOFException");
+                    break; // End of stream reached
                 }
                 byte[] chunk = new byte[chunkSize];
                 inputStream.readFully(chunk);
                 chunks.add(chunk);
             }
+            System.out.println("FINISHED WHILE LOOP");
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         // Reassemble the file
-        fileHandling.assembleFile(chunks, outputFilePath);
+        fileHandling.assembleFile(chunks, fileName);
         // Add logging
         System.out.println("Received file from " + inputStream);
-        System.out.println("File saved to " + outputFilePath);
+        System.out.println("File saved to " + fileName);
     }
 
     // Basic helper methods
