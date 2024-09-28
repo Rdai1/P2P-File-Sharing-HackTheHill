@@ -1,3 +1,4 @@
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -32,10 +33,33 @@ public class Node {
     }
 
 
-    // This method will typically read from a file (filePath), then divide into chunks of 512 bytes.
+    // This method will read from a file (filePath), then divide into chunks of 512 bytes.
     public List<byte[]> chunkFile(String filePath) {
         return new ArrayList<>(); // placeholder code to not get errors.
     }
+
+    // This method will reassemble the previously chunked data back into a complete file.
+    private void assembleFile(List<byte[]> chunks, String outputFilePath) throws IOException {
+
+    }
+
+    // This method will handle sending chunks of data to other peers.
+    public void send(String targetPeerID, String filePath) {
+        List<byte[]> chunks = chunkFile(filePath);
+        // To implement later.
+    }
+
+    // This method will handle receiving chunks of data from other peers.
+    public void receive(DataInputStream inputStream, String outputFilePath) throws IOException {
+        List<byte[]> chunks = new ArrayList<>();
+        // To implement later.
+
+        assembleFile(chunks, outputFilePath);
+    }
+
+
+
+
 
 
     //basic helper methods
