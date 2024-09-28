@@ -2,6 +2,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.FileOutputStream;
 
 public class FileHandling {
     private static final int CHUNK_SIZE = 512;
@@ -29,7 +30,14 @@ public class FileHandling {
 
 
     // This method will reassemble the previously chunked data back into a complete file.
-    private void assembleFile(List<byte[]> chunks, String outputFilePath) throws IOException {
+    public void assembleFile(List<byte[]> chunks, String outputFilePath) throws IOException {
+        try (FileOutputStream outputFile = new FileOutputStream(outputFilePath)) {
+            for (byte[] chunk : chunks) {
+                outputFile.write(chunk);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 }

@@ -108,7 +108,7 @@ public class Node {
         }
 
         // Reassemble the file
-        //fileHandling.assembleFile(chunks, outputFilePath);
+        fileHandling.assembleFile(chunks, outputFilePath);
         // Add logging
         System.out.println("Received file from " + inputStream);
         System.out.println("File saved to " + outputFilePath);
