@@ -45,7 +45,18 @@ public class Node {
 
     //to do later... this method handles the incoming connection. (calls receive function).
     public void handleConnection(Socket socket) throws IOException{
-        
+        try(DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+            String outputFilePath = "output.txt";
+            receive(inputStream, "output.txt");
+            System.out.println("Successfully received, saved to  " + outputFilePath );
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("Error receiving file " + e.getMessage());
+        }
+        finally {
+            socket.close();
+        }
 
     }
 
