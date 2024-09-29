@@ -2,8 +2,10 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -20,6 +22,14 @@ public class Node {
     private FileHandling fileHandling; // Instance of FileHandling
 
     // Constructor
+    public Node(String peerID) {
+        this.peerID = peerID;
+        // this.port = port;
+        this.peers = new ArrayList<Node>();
+        this.IPAddress = getLocalIPAddress(); // Fetch local IP address
+        this.fileHandling = new FileHandling(); // Initialize FileHandling instance
+    }
+
     public Node(String peerID, int port, List<Node> peers) {
         this.peerID = peerID;
         this.port = port;
@@ -28,12 +38,47 @@ public class Node {
         this.fileHandling = new FileHandling(); // Initialize FileHandling instance
     }
 
+    public void discoverPeer() throws IOException{
+        for (int p = 5000; p < 5010; p++){
+            if (p == port){continue;}
+            try (Socket socket = new Socket()){
+                socket.connect(new InetSocketAddress(IPAddress, p), 2000);
+                System.out.println("Attempting to connect to on port " + port);
+
+                System.out.println("FOUND A FRIEND");
+
+                break;
+            } catch (SocketTimeoutException e) {
+                System.out.println("Port " + port + " timed out.");
+            } catch (IOException e) {
+                System.out.println("No client found on port " + port + ".");
+            }
+        }
+    }
+
     // Method to accept incoming connections and log them.
     public void startListening() throws IOException {
-        ServerSocket serverSocket = new ServerSocket(port);
+        ServerSocket serverSocket = new ServerSocket();
+        boolean flag = false;
+
+        for (int p = 5000; p < 5010; p++){
+            try{
+                serverSocket = new ServerSocket(p);
+                System.out.println("Assigned client to port: " + port);
+                flag = true;
+                break;
+            }catch (IOException e) {
+                System.out.println("Port " + port + " is already in use. Trying next...");
+            }
+        }
+
+        System.out.println("IP ADDRESS: " + IPAddress);
+
         System.out.println("Peer " + peerID + " is listening on port " + port);
 
-        while (true) {
+        discoverPeer();
+        
+        while (flag) {
             Socket socket = serverSocket.accept();
             System.out.println("Accepted connection from " + socket.getInetAddress());
 
@@ -51,15 +96,25 @@ public class Node {
     // This method handles the incoming connection (calls receive function).
     public void handleConnection(Socket socket) throws IOException {
         try (DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
-            String outputFilePath = "output.txt";
-            receive(inputStream, outputFilePath);
-            System.out.println("Successfully received, saved to " + outputFilePath);
+            String command = inputStream.readUTF();
+            if (command.equals("Send")){
+                String outputFilePath = "output.txt";
+                receive(inputStream, outputFilePath);
+                System.out.println("Successfully received, saved to " + outputFilePath);
+            }else if (command.equals("getPeers")){
+
+            }
+
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Error receiving file " + e.getMessage());
         } finally {
             socket.close();
         }
+    }
+
+    public void sendPeer(){
+        
     }
 
     // This method will handle sending chunks of data to other peers.
@@ -85,6 +140,7 @@ public class Node {
              DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
 
             // Send file name and size
+            outputStream.writeUTF("Send");
             outputStream.writeUTF(file.getName());
             outputStream.writeLong(file.length()); // Send file size
             outputStream.writeInt(chunks.size());
@@ -116,7 +172,6 @@ public class Node {
         long fileSize = inputStream.readLong(); // Receive the expected file size
 
         try {
-            System.out.println("BEFORE WHILE LOOP");
 
             // Read the expected number of chunks
             int chunkCount = inputStream.readInt();
@@ -193,5 +248,20 @@ public class Node {
             e.printStackTrace();
             return "0.0.0.0";
         }
+    }
+
+    public static void main(String[] args) {
+        if (args.length >= 1){
+            Node peer = new Node(args[0]);
+
+            new Thread(() -> {
+                try {
+                    peer.startListening();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+        }
+        
     }
 }
