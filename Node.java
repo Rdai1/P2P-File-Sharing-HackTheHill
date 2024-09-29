@@ -45,13 +45,13 @@ public class Node {
 
     @SuppressWarnings("unchecked")
     public void discoverPeer() throws IOException {
-        for (int p = 5000; p < 5005; p++) {
+        for (int p = 5000; p < 5010; p++) {
             if (p == port) {
                 continue;
             }
             try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress(IPAddress, p), 2000);
-                System.out.println("Attempting to connect to on port " + p);
+                socket.connect(new InetSocketAddress(IPAddress, p), 1000);
+                // System.out.println("Attempting to connect to on port " + p);
 
                 try (DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
                     outputStream.writeUTF("getPeers");
@@ -235,7 +235,7 @@ public class Node {
 
         // Now, receive the file hash
         String receivedHash = inputStream.readUTF();
-        System.out.println("Received file hash: " + receivedHash);
+        // System.out.println("Received file hash: " + receivedHash);
 
         // Verify the integrity of the received file
         try {
