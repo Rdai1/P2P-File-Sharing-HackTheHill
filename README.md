@@ -48,7 +48,7 @@ javac Node.java
 ```
 
 Step 2: Start Peers
-Create multiple peers (at least 4) using the following command on different terminals, where <ID> is any unique identifier for each peer:
+Create multiple peers (at least 4) using the following command, where <ID> is any unique identifier for each peer:
 ```bash
 java Node <ID>
 ```
