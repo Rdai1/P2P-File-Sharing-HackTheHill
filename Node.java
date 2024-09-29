@@ -1,14 +1,17 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
-import java.io.EOFException;
 import java.io.File;
 
 public class Node {
@@ -16,24 +19,91 @@ public class Node {
     private String peerID; // unique id
     private String IPAddress; // ip address
     private int port; // port number
-    private List<Node> peers; // this is the list of peers
+    // private List<Node> peers; // this is the list of peers
+    private List<Info> peers;
     private FileHandling fileHandling; // Instance of FileHandling
 
     // Constructor
-    public Node(String peerID, int port, List<Node> peers) {
+    public Node(String peerID) {
         this.peerID = peerID;
-        this.port = port;
-        this.peers = peers;
+        // this.port = port;
+        this.peers = new ArrayList<Info>();
         this.IPAddress = getLocalIPAddress(); // Fetch local IP address
         this.fileHandling = new FileHandling(); // Initialize FileHandling instance
     }
 
+    public Node(String peerID, int port, List<Node> peers) {
+        this.peerID = peerID;
+        this.port = port;
+        // this.peers = peers;
+        this.IPAddress = getLocalIPAddress(); // Fetch local IP address
+        this.fileHandling = new FileHandling(); // Initialize FileHandling instance
+    }
+
+    @SuppressWarnings("unchecked")
+    public void discoverPeer() throws IOException{
+        for (int p = 5000; p < 5005; p++){
+            if (p == port){continue;}
+            try (Socket socket = new Socket()){
+                socket.connect(new InetSocketAddress(IPAddress, p), 2000);
+                System.out.println("Attempting to connect to on port " + p);
+
+                System.out.println("FOUND A FRIEND on: " + p);
+
+                try(DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())){
+                    System.out.println("test");
+                    outputStream.writeUTF("getPeers");
+                    outputStream.writeUTF(peerID);
+                    System.out.println("Inside Try");
+
+                    try (ObjectInputStream  inputStream = new ObjectInputStream (socket.getInputStream())){
+                        peers = (List<Info>) inputStream.readObject();
+                    } catch (ClassNotFoundException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                    
+                    System.out.println(peers.size());
+                    if (peers.size() > 0){
+                        System.out.println("there is a friend");
+                        for (Info i: peers){
+                            System.out.println(i.peerID);
+                        }
+                    }
+                }
+                break;
+            } catch (SocketTimeoutException e) {
+                System.out.println("Port " + p + " timed out, no friend on this port");
+            } catch (IOException e) {
+                System.out.println("No client found on port " + port + ".");
+            }
+        }
+    }
+
     // Method to accept incoming connections and log them.
     public void startListening() throws IOException {
-        ServerSocket serverSocket = new ServerSocket(port);
+        ServerSocket serverSocket = new ServerSocket();
+        boolean flag = false;
+
+        for (int p = 5000; p <= 5010; p++){
+            try{
+                serverSocket = new ServerSocket(p);
+                port = p;
+                System.out.println("Assigned client to port: " + port);
+                flag = true;
+                break;
+            }catch (IOException e) {
+                System.out.println("Port " + port + " is already in use. Trying next...");
+            }
+        }
+
+        System.out.println("IP ADDRESS: " + IPAddress);
+
         System.out.println("Peer " + peerID + " is listening on port " + port);
 
-        while (true) {
+        discoverPeer();
+        
+        while (flag) {
             Socket socket = serverSocket.accept();
             System.out.println("Accepted connection from " + socket.getInetAddress());
 
@@ -50,15 +120,44 @@ public class Node {
 
     // This method handles the incoming connection (calls receive function).
     public void handleConnection(Socket socket) throws IOException {
+        System.out.println("Handling connection");
         try (DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
-            String outputFilePath = "output.txt";
-            receive(inputStream, outputFilePath);
-            System.out.println("Successfully received, saved to " + outputFilePath);
+            System.out.println("reading utf");
+            String command = inputStream.readUTF();
+            if (command.equals("receive")){
+                String outputFilePath = "output.txt";
+                receive(inputStream, outputFilePath);
+                System.out.println("Successfully received, saved to " + outputFilePath);
+            }else if(command.equals("send")){
+                String filePath = inputStream.readUTF();
+                send(socket.getInetAddress().getHostAddress(), filePath);
+                System.out.println("File uploaded.");
+                System.out.println("File uploaded.");
+            }else if (command.equals("getPeers")){
+                System.out.println("calling getting peers");
+                String from = inputStream.readUTF();
+                sendPeers(socket, from);
+            }
+
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Error receiving file " + e.getMessage());
         } finally {
             socket.close();
+        }
+    }
+
+    public void sendPeers(Socket s, String from) throws IOException{
+        try (ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream())){
+            List<Info> allPeers = new ArrayList<Info>();
+            for (Info p: peers){
+                allPeers.add(new Info(p.peerID, p.IPAddress, p.port));
+            }
+            allPeers.add(new Info(peerID, IPAddress, port));
+            out.writeObject(allPeers);
+            out.flush();
+            System.out.println("Peers list sent to client peer");
+            peers.add(new Info(from, s.getInetAddress().getLocalHost().getHostAddress(), s.getPort()));
         }
     }
 
@@ -68,9 +167,9 @@ public class Node {
         File file = new File(filePath);
 
         // Find the target peer in the list of peers.
-        Node targetPeer = null;
-        for (Node peer : peers) {
-            if (peer.getPeerID().equals(targetPeerID)) {
+        Info targetPeer = null;
+        for (Info peer : peers) {
+            if (peer.peerID.equals(targetPeerID)) {
                 targetPeer = peer;
                 break;
             }
@@ -81,10 +180,11 @@ public class Node {
         }
 
         // Create a socket connection to the peer's IP address and port number.
-        try (Socket socket = new Socket(targetPeer.getIPAddress(), targetPeer.getPort());
+        try (Socket socket = new Socket(targetPeer.IPAddress, targetPeer.port);
              DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
 
             // Send file name and size
+            outputStream.writeUTF("send");
             outputStream.writeUTF(file.getName());
             outputStream.writeLong(file.length()); // Send file size
             outputStream.writeInt(chunks.size());
@@ -116,7 +216,6 @@ public class Node {
         long fileSize = inputStream.readLong(); // Receive the expected file size
 
         try {
-            System.out.println("BEFORE WHILE LOOP");
 
             // Read the expected number of chunks
             int chunkCount = inputStream.readInt();
@@ -166,8 +265,8 @@ public class Node {
 
 
     // Basic helper methods
-    public void addPeer(Node peer) {
-        peers.add(peer);
+    public void addPeer(String id, String ip, int port) {
+        peers.add(new Info(id, ip, port));
     }
 
     public int getPort() {
@@ -182,7 +281,7 @@ public class Node {
         return IPAddress;
     }
 
-    public List<Node> getPeers() {
+    public List<Info> getPeers() {
         return peers;
     }
 
@@ -193,5 +292,20 @@ public class Node {
             e.printStackTrace();
             return "0.0.0.0";
         }
+    }
+
+    public static void main(String[] args) {
+        if (args.length >= 1){
+            Node peer = new Node(args[0]);
+
+            new Thread(() -> {
+                try {
+                    peer.startListening();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+        }
+        
     }
 }
