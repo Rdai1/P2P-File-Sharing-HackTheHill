@@ -5,6 +5,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.EOFException;
@@ -63,7 +64,7 @@ public class Node {
 
     // This method will handle sending chunks of data to other peers.
     public void send(String targetPeerID, String filePath) {
-        List<FileChunk> chunks = fileHandling.chunkFile(filePath); // Use the imported method
+        List<FileChunk> chunks = fileHandling.chunkFile(filePath);
         File file = new File(filePath);
 
         // Find the target peer in the list of peers.
@@ -81,44 +82,53 @@ public class Node {
 
         // Create a socket connection to the peer's IP address and port number.
         try (Socket socket = new Socket(targetPeer.getIPAddress(), targetPeer.getPort());
-            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
-            
+             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+
+            // Send file name and size
             outputStream.writeUTF(file.getName());
-            outputStream.writeLong(file.length());
+            outputStream.writeLong(file.length()); // Send file size
+            outputStream.writeInt(chunks.size());
+
+            // Calculate the hash of the file
+            String fileHash = HashUtil.generateFileHash(file); // Implement this method to use SHA-256
 
             // Send the chunks to the peer.
             for (FileChunk chunk : chunks) {
                 outputStream.writeInt(chunk.getData().length); // Send chunk size as an integer
                 outputStream.write(chunk.getData());           // Send chunk data
             }
-        } catch (IOException e) {
+
+            // Send the hash after sending all chunks
+            outputStream.writeUTF(fileHash);
+            System.out.println("Sent file hash: " + fileHash);
+        } catch (IOException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
 
         // Close the socket connection
-        // Add logging
         System.out.println("Sent file to " + targetPeerID);
     }
 
     // This method will handle receiving chunks of data from other peers.
     public void receive(DataInputStream inputStream, String outputFilePath) throws IOException {
         List<byte[]> chunks = new ArrayList<>();
-        String fileName = "received" + inputStream.readUTF();   // Receive the file name
-        long fileSize = inputStream.readLong();
+        String fileName = "received_" + inputStream.readUTF(); // Receive the file name
+        long fileSize = inputStream.readLong(); // Receive the expected file size
+
         try {
             System.out.println("BEFORE WHILE LOOP");
-            while (true) {
-                int chunkSize;
-                try {
-                    chunkSize = inputStream.readInt(); // Read chunk size as an integer
-                } catch (EOFException e) {
-                    System.out.println("EOFException");
-                    break; // End of stream reached
-                }
+
+            // Read the expected number of chunks
+            int chunkCount = inputStream.readInt();
+
+            // Read all the expected chunks
+            for (int i = 0; i < chunkCount; i++) {
+                int chunkSize = inputStream.readInt(); // Read chunk size as an integer
                 byte[] chunk = new byte[chunkSize];
                 inputStream.readFully(chunk);
                 chunks.add(chunk);
             }
+
             System.out.println("FINISHED WHILE LOOP");
         } catch (IOException e) {
             e.printStackTrace();
@@ -126,10 +136,34 @@ public class Node {
 
         // Reassemble the file
         fileHandling.assembleFile(chunks, fileName);
-        // Add logging
         System.out.println("Received file from " + inputStream);
         System.out.println("File saved to " + fileName);
+
+        // Now, receive the file hash
+        String receivedHash = inputStream.readUTF();
+        System.out.println("Received file hash: " + receivedHash);
+
+        // Verify the integrity of the received file
+        try {
+            // Check the file size
+            if (new File(fileName).length() != fileSize) {
+                System.out.println("File size does not match. Possible corruption.");
+                return;
+            }
+
+            // Calculate the SHA-256 hash of the received file
+            String calculatedHash = HashUtil.generateFileHash(new File(fileName));
+            if (receivedHash.equals(calculatedHash)) {
+                System.out.println("File integrity verified.");
+            } else {
+                System.out.println("File integrity check failed. The file may be corrupted.");
+            }
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
     }
+
+
 
     // Basic helper methods
     public void addPeer(Node peer) {
