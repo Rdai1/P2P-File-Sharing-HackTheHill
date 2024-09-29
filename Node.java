@@ -3,6 +3,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -51,24 +52,18 @@ public class Node {
                 socket.connect(new InetSocketAddress(IPAddress, p), 2000);
                 System.out.println("Attempting to connect to on port " + p);
 
-                System.out.println("FOUND A FRIEND on: " + p);
-
                 try (DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
-                    System.out.println("test");
                     outputStream.writeUTF("getPeers");
                     outputStream.writeUTF(peerID);
-                    System.out.println("Inside Try");
 
                     try (ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
                         peers = (List<Info>) inputStream.readObject();
                     } catch (ClassNotFoundException e) {
-                        // TODO Auto-generated catch block
                         e.printStackTrace();
                     }
 
                     System.out.println(peers.size());
                     if (peers.size() > 0) {
-                        System.out.println("there is a friend");
                         for (Info i : peers) {
                             System.out.println(i.peerID);
                         }
@@ -76,7 +71,6 @@ public class Node {
                 }
                 break;
             } catch (SocketTimeoutException e) {
-                System.out.println("Port " + p + " timed out, no friend on this port");
             } catch (IOException e) {
                 System.out.println("No client found on port " + port + ".");
             }
@@ -100,7 +94,6 @@ public class Node {
             }
         }
 
-        System.out.println("IP ADDRESS: " + IPAddress);
 
         System.out.println("Peer " + peerID + " is listening on port " + port);
 
@@ -123,9 +116,7 @@ public class Node {
 
     // This method handles the incoming connection (calls receive function).
     public void handleConnection(Socket socket) throws IOException {
-        System.out.println("Handling connection");
         try (DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
-            System.out.println("reading utf");
             String command = inputStream.readUTF();
             if (command.equals("receive")) {
                 String outputFilePath = "output.txt";
@@ -135,11 +126,11 @@ public class Node {
                 String filePath = inputStream.readUTF();
                 send(socket.getInetAddress().getHostAddress(), filePath);
                 System.out.println("File uploaded.");
-                System.out.println("File uploaded.");
             } else if (command.equals("getPeers")) {
-                System.out.println("calling getting peers");
                 String from = inputStream.readUTF();
                 sendPeers(socket, from);
+            }else if (command.equals("remove")){
+                removePeer(inputStream.readUTF());
             }
 
         } catch (IOException e) {
@@ -159,7 +150,6 @@ public class Node {
             allPeers.add(new Info(peerID, IPAddress, port));
             out.writeObject(allPeers);
             out.flush();
-            System.out.println("Peers list sent to client peer");
             peers.add(new Info(from, s.getInetAddress().getLocalHost().getHostAddress(), s.getPort()));
         }
     }
@@ -184,10 +174,10 @@ public class Node {
 
         // Create a socket connection to the peer's IP address and port number.
         try (Socket socket = new Socket(targetPeer.IPAddress, targetPeer.port);
-             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
 
             // Send file name and size
-            outputStream.writeUTF("send");
+            outputStream.writeUTF("receive");
             outputStream.writeUTF(file.getName());
             outputStream.writeLong(file.length()); // Send file size
             outputStream.writeInt(chunks.size());
@@ -203,7 +193,7 @@ public class Node {
 
             // Send the hash after sending all chunks
             outputStream.writeUTF(fileHash);
-            System.out.println("Sent file hash: " + fileHash);
+            // System.out.println("Sent file hash: " + fileHash);
         } catch (IOException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
@@ -220,6 +210,7 @@ public class Node {
 
         try {
 
+            System.out.println("In try");
             // Read the expected number of chunks
             int chunkCount = inputStream.readInt();
 
@@ -231,7 +222,6 @@ public class Node {
                 chunks.add(chunk);
             }
 
-            System.out.println("FINISHED WHILE LOOP");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -265,10 +255,29 @@ public class Node {
         }
     }
 
+    public void terminateConnection() throws IOException{
+        for (Info p: peers){
+            try (Socket socket = new Socket(p.IPAddress, p.port)){
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                out.writeUTF("remove");
+                out.writeUTF(peerID);
+            }
+            
+        }
+    }
 
     // Basic helper methods
     public void addPeer(String id, String ip, int port) {
         peers.add(new Info(id, ip, port));
+    }
+
+    public void removePeer(String id){
+        for (Info p: peers){
+            if (p.peerID.equals(id)){
+                peers.remove(p);
+                break;
+            }
+        }
     }
 
     public int getPort() {
@@ -298,7 +307,7 @@ public class Node {
 
     public static void main(String[] args) {
         if (args.length < 1) {
-            System.out.println("Usage: java Node <peerID>");
+            // System.out.println("Usage: java Node <peerID>");
             return;
         }
 
@@ -340,6 +349,12 @@ public class Node {
 
                 case 3:
                     running = false;
+                    try {
+                        peer.terminateConnection();
+                    } catch (IOException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
                     break;
 
                 default:
