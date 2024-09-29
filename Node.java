@@ -3,7 +3,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -24,6 +23,7 @@ public class Node {
     // private List<Node> peers; // this is the list of peers
     private List<Info> peers;
     private FileHandling fileHandling; // Instance of FileHandling
+    private Boolean run;
 
     // Constructor
     public Node(String peerID) {
@@ -32,6 +32,7 @@ public class Node {
         this.peers = new ArrayList<Info>();
         this.IPAddress = getLocalIPAddress(); // Fetch local IP address
         this.fileHandling = new FileHandling(); // Initialize FileHandling instance
+        this.run = true;
     }
 
     public Node(String peerID, int port, List<Node> peers) {
@@ -58,21 +59,16 @@ public class Node {
 
                     try (ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
                         peers = (List<Info>) inputStream.readObject();
+                        notifiyExistence();
                     } catch (ClassNotFoundException e) {
                         e.printStackTrace();
                     }
 
-                    System.out.println(peers.size());
-                    if (peers.size() > 0) {
-                        for (Info i : peers) {
-                            System.out.println(i.peerID);
-                        }
-                    }
                 }
                 break;
             } catch (SocketTimeoutException e) {
             } catch (IOException e) {
-                System.out.println("No client found on port " + port + ".");
+                // System.out.println("No client found on port " + port + ".");
             }
         }
     }
@@ -99,9 +95,9 @@ public class Node {
 
         discoverPeer();
 
-        while (flag) {
+        while (flag && this.run) {
             Socket socket = serverSocket.accept();
-            System.out.println("Accepted connection from " + socket.getInetAddress());
+            // System.out.println("Accepted connection from " + socket.getInetAddress());
 
             // Handle this new connection in its own thread
             new Thread(() -> {
@@ -121,16 +117,22 @@ public class Node {
             if (command.equals("receive")) {
                 String outputFilePath = "output.txt";
                 receive(inputStream, outputFilePath);
+
                 System.out.println("Successfully received, saved to " + outputFilePath);
             } else if (command.equals("send")) {
                 String filePath = inputStream.readUTF();
                 send(socket.getInetAddress().getHostAddress(), filePath);
                 System.out.println("File uploaded.");
+
             } else if (command.equals("getPeers")) {
                 String from = inputStream.readUTF();
                 sendPeers(socket, from);
+
             }else if (command.equals("remove")){
                 removePeer(inputStream.readUTF());
+
+            }else if (command.equals("add")){
+                addPeer(inputStream.readUTF(), inputStream.readUTF(), inputStream.readInt());
             }
 
         } catch (IOException e) {
@@ -262,13 +264,31 @@ public class Node {
                 out.writeUTF("remove");
                 out.writeUTF(peerID);
             }
-            
+        }
+        run();
+    }
+
+    public void notifiyExistence() throws IOException {
+        for (Info p: peers){
+            try (Socket socket = new Socket(p.IPAddress, p.port)){
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                out.writeUTF("Add");
+                out.writeUTF(peerID);
+                out.writeUTF(IPAddress);
+                out.writeInt(port);
+            }
         }
     }
 
     // Basic helper methods
     public void addPeer(String id, String ip, int port) {
-        peers.add(new Info(id, ip, port));
+        boolean flag = true;
+        for (Info p: peers){
+            if (p.peerID == id){
+                flag = false;
+            }
+        }
+        if (flag){ peers.add(new Info(id, ip, port));}
     }
 
     public void removePeer(String id){
@@ -303,6 +323,10 @@ public class Node {
             e.printStackTrace();
             return "0.0.0.0";
         }
+    }
+
+    public void run(){
+        this.run = !run;
     }
 
     public static void main(String[] args) {
@@ -363,5 +387,6 @@ public class Node {
         }
 
         scanner.close();
+        System.exit(0);
     }
 }
