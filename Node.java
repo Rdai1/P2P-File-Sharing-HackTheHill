@@ -124,11 +124,15 @@ public class Node {
         try (DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
             System.out.println("reading utf");
             String command = inputStream.readUTF();
-            System.out.println(command);
             if (command.equals("receive")){
                 String outputFilePath = "output.txt";
                 receive(inputStream, outputFilePath);
                 System.out.println("Successfully received, saved to " + outputFilePath);
+            }else if(command.equals("send")){
+                String filePath = inputStream.readUTF();
+                send(socket.getInetAddress().getHostAddress(), filePath);
+                System.out.println("File uploaded.");
+                System.out.println("File uploaded.");
             }else if (command.equals("getPeers")){
                 System.out.println("calling getting peers");
                 String from = inputStream.readUTF();
@@ -180,7 +184,7 @@ public class Node {
              DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
 
             // Send file name and size
-            outputStream.writeUTF("Send");
+            outputStream.writeUTF("send");
             outputStream.writeUTF(file.getName());
             outputStream.writeLong(file.length()); // Send file size
             outputStream.writeInt(chunks.size());
