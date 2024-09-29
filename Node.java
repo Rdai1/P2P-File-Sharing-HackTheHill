@@ -86,7 +86,7 @@ public class Node {
                 flag = true;
                 break;
             } catch (IOException e) {
-                System.out.println("Port " + port + " is already in use. Trying next...");
+                // System.out.println("Port " + port + " is already in use. Trying next...");
             }
         }
 
@@ -357,7 +357,7 @@ public class Node {
             int command = scanner.nextInt();
             switch (command) {
                 case 1:
-                    System.out.println("Peers:");
+                    System.out.println("\nPeers:");
                     for (Info p : peer.getPeers()) {
                         System.out.println("ID: " + p.peerID + ", IP: " + p.IPAddress + ", Port: " + p.port);
                     }
