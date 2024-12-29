@@ -76,3 +76,6 @@ After starting a peer, you will be prompted with the following options:
 
 ### File Integrity Verification
 The system ensures file integrity by comparing the SHA-256 hash of the original file with the hash of the reassembled file on the receiving peer. If the hashes match, the transfer is verified; otherwise, the system flags potential corruption.
+
+### Authors
+Raymond Dai, Mahad Toukaleh, Ahmed Abdullahi, Abody Majeed.
